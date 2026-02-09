@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client"
+  output       = "./generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum LoginProvider {
+  EMAIL
+  GOOGLE
+}
+
+
+model User {
+  id            String        @id @unique @default(uuid()) @db.Uuid
+  name          String
+  email         String        @unique
+  avatar        String?
+  password      String?
+  salt          String?
+  role          UserRole @default(USER)
+  loginProvider LoginProvider @default(EMAIL)
+
+  hasNotifications Boolean @default(false)
+  isEmailVerified  Boolean @default(false)
+
+  lastLoginAt  DateTime?
+  lastActiveAt DateTime?
+ 
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Verification Relations
+  otpVerifications   OtpVerification[]
+  verificationTokens VerificationToken[]
+
+  userProfile UserProfile? @relation("UserProfile")
+  
+  @@index([name])
+  @@index([email])
+}
+
+
+enum OtpType {
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  PASSWORD_RESET
+  LOGIN_VERIFICATION
+  TWO_FACTOR_AUTH
+}
+
+enum OtpChannel {
+  EMAIL
+  SMS
+}
+
+model OtpVerification {
+  id      String     @id @unique @default(uuid()) @db.Uuid
+  userId  String     @db.Uuid
+  code    String // Store hashed OTP for security
+  type    OtpType
+  channel OtpChannel @default(EMAIL)
+
+  expiresAt   DateTime
+  verified    Boolean  @default(false)
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3)
+
+  // Additional security fields
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@index([expiresAt])
+  @@index([createdAt])
+}
+
+model RateLimit {
+  id          String          @id @unique @default(uuid()) @db.Uuid
+  identifier  String // IP, email, or userId
+  action      RateLimitAction
+  count       Int             @default(1)
+  windowStart DateTime        @default(now())
+  expiresAt   DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([identifier, action])
+  @@index([identifier, action])
+  @@index([expiresAt])
+}
+
+enum RateLimitAction {
+  SEND_OTP
+  VERIFY_OTP
+  RESET_PASSWORD
+  LOGIN_VERIFICATION
+  TWO_FACTOR_AUTH
+}
+
+model VerificationToken {
+  id        String   @id @unique @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  used      Boolean  @default(false)
+  type      OtpType
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model UserProfile {
+  id        String   @id @unique @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid @unique
+  age       Int?
+  gender    Gender?
+  address   String?
+  city      String?
+  state     String?
+  country   String?
+  postalCode String?
+  phone     String?
+  website   String?
+  bio       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("UserProfile", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
