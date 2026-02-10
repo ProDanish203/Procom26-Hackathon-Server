@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/common/services/prisma.service';
 import { AppLoggerService } from 'src/common/services/logger.service';
+import { RedisService } from 'src/common/services/redis.service';
 import { ApiResponse } from 'src/common/types';
 import { throwError } from 'src/common/utils/helpers';
 import { IBFTTransferDto, RAASTTransferDto, BillPaymentDto, MobileRechargeDto, GetPaymentsQueryDto } from './dto/payment.dto';
@@ -12,12 +13,29 @@ import { User, PaymentType, PaymentStatus, Prisma, AccountStatus } from '@db';
 export class PaymentService {
   private readonly logger = new AppLoggerService(PaymentService.name);
 
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   private generateReference(): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8).toUpperCase();
     return `PAY-${timestamp}-${random}`;
+  }
+
+  private async invalidatePaymentCaches(userId: string): Promise<void> {
+    // Invalidate account caches (balance changed)
+    await this.redisService.deleteMany([
+      `account:${userId}:all`,
+      `account:${userId}:dashboard`,
+    ]);
+
+    // Invalidate transaction caches (new payment transaction)
+    await this.redisService.delete(`transaction:${userId}:account`);
+
+    // Invalidate payment caches
+    await this.redisService.delete(`payment:${userId}:history`);
   }
 
   private calculateFee(paymentType: PaymentType): number {
@@ -50,17 +68,19 @@ export class PaymentService {
 
       const fee = this.calculateFee(PaymentType.IBFT_TRANSFER);
       const totalAmount = amount + fee;
+      const currentBalance = Number(account.balance);
 
-      if (Number(account.balance) < totalAmount) {
+      if (currentBalance < totalAmount) {
         throw throwError('Insufficient balance', HttpStatus.BAD_REQUEST);
       }
 
       const reference = this.generateReference();
+      const newBalance = new Prisma.Decimal(currentBalance - totalAmount);
 
       const payment = await this.prismaService.$transaction(async (prisma) => {
         await prisma.account.update({
           where: { id: accountId },
-          data: { balance: Number(account.balance) - totalAmount },
+          data: { balance: newBalance },
         });
 
         return await prisma.payment.create({
@@ -70,9 +90,9 @@ export class PaymentService {
             beneficiaryId,
             paymentType: PaymentType.IBFT_TRANSFER,
             paymentStatus: PaymentStatus.PROCESSING,
-            amount,
-            fee,
-            totalAmount,
+            amount: new Prisma.Decimal(amount),
+            fee: new Prisma.Decimal(fee),
+            totalAmount: new Prisma.Decimal(totalAmount),
             currency: 'PKR',
             recipientName,
             recipientAccount,
@@ -86,6 +106,9 @@ export class PaymentService {
       });
 
       this.logger.log(`IBFT transfer initiated: ${reference}`);
+
+      // Invalidate caches
+      await this.invalidatePaymentCaches(user.id);
 
       return {
         message: 'IBFT transfer initiated successfully. Processing time: 1-2 business days',
@@ -111,17 +134,19 @@ export class PaymentService {
 
       const fee = this.calculateFee(PaymentType.RAAST_TRANSFER);
       const totalAmount = amount + fee;
+      const currentBalance = Number(account.balance);
 
-      if (Number(account.balance) < totalAmount) {
+      if (currentBalance < totalAmount) {
         throw throwError('Insufficient balance', HttpStatus.BAD_REQUEST);
       }
 
       const reference = this.generateReference();
+      const newBalance = new Prisma.Decimal(currentBalance - totalAmount);
 
       const payment = await this.prismaService.$transaction(async (prisma) => {
         await prisma.account.update({
           where: { id: accountId },
-          data: { balance: Number(account.balance) - totalAmount },
+          data: { balance: newBalance },
         });
 
         return await prisma.payment.create({
@@ -131,9 +156,9 @@ export class PaymentService {
             beneficiaryId,
             paymentType: PaymentType.RAAST_TRANSFER,
             paymentStatus: PaymentStatus.COMPLETED,
-            amount,
-            fee,
-            totalAmount,
+            amount: new Prisma.Decimal(amount),
+            fee: new Prisma.Decimal(fee),
+            totalAmount: new Prisma.Decimal(totalAmount),
             currency: 'PKR',
             recipientName,
             recipientIban,
@@ -147,6 +172,9 @@ export class PaymentService {
       });
 
       this.logger.log(`RAAST transfer completed: ${reference}`);
+
+      // Invalidate caches
+      await this.invalidatePaymentCaches(user.id);
 
       return {
         message: 'RAAST transfer completed successfully',
@@ -172,17 +200,19 @@ export class PaymentService {
 
       const fee = this.calculateFee(PaymentType.UTILITY_BILL);
       const totalAmount = amount + fee;
+      const currentBalance = Number(account.balance);
 
-      if (Number(account.balance) < totalAmount) {
+      if (currentBalance < totalAmount) {
         throw throwError('Insufficient balance', HttpStatus.BAD_REQUEST);
       }
 
       const reference = this.generateReference();
+      const newBalance = new Prisma.Decimal(currentBalance - totalAmount);
 
       const payment = await this.prismaService.$transaction(async (prisma) => {
         await prisma.account.update({
           where: { id: accountId },
-          data: { balance: Number(account.balance) - totalAmount },
+          data: { balance: newBalance },
         });
 
         return await prisma.payment.create({
@@ -192,14 +222,14 @@ export class PaymentService {
             beneficiaryId,
             paymentType: PaymentType.UTILITY_BILL,
             paymentStatus: PaymentStatus.COMPLETED,
-            amount,
-            fee,
-            totalAmount,
+            amount: new Prisma.Decimal(amount),
+            fee: new Prisma.Decimal(fee),
+            totalAmount: new Prisma.Decimal(totalAmount),
             currency: 'PKR',
             recipientName: billerName,
             billerName,
             consumerNumber,
-            billAmount: amount,
+            billAmount: new Prisma.Decimal(amount),
             billMonth,
             dueDate: dueDate ? new Date(dueDate) : undefined,
             description: `Bill payment for ${billerName}`,
@@ -212,6 +242,9 @@ export class PaymentService {
       });
 
       this.logger.log(`Bill payment completed: ${reference}`);
+
+      // Invalidate caches
+      await this.invalidatePaymentCaches(user.id);
 
       return {
         message: 'Bill payment completed successfully',
@@ -237,17 +270,19 @@ export class PaymentService {
 
       const fee = this.calculateFee(PaymentType.MOBILE_RECHARGE);
       const totalAmount = amount + fee;
+      const currentBalance = Number(account.balance);
 
-      if (Number(account.balance) < totalAmount) {
+      if (currentBalance < totalAmount) {
         throw throwError('Insufficient balance', HttpStatus.BAD_REQUEST);
       }
 
       const reference = this.generateReference();
+      const newBalance = new Prisma.Decimal(currentBalance - totalAmount);
 
       const payment = await this.prismaService.$transaction(async (prisma) => {
         await prisma.account.update({
           where: { id: accountId },
-          data: { balance: Number(account.balance) - totalAmount },
+          data: { balance: newBalance },
         });
 
         return await prisma.payment.create({
@@ -256,9 +291,9 @@ export class PaymentService {
             accountId,
             paymentType: PaymentType.MOBILE_RECHARGE,
             paymentStatus: PaymentStatus.COMPLETED,
-            amount,
-            fee,
-            totalAmount,
+            amount: new Prisma.Decimal(amount),
+            fee: new Prisma.Decimal(fee),
+            totalAmount: new Prisma.Decimal(totalAmount),
             currency: 'PKR',
             recipientName: mobileNumber,
             mobileNumber,
@@ -273,6 +308,9 @@ export class PaymentService {
       });
 
       this.logger.log(`Mobile recharge completed: ${reference}`);
+
+      // Invalidate caches
+      await this.invalidatePaymentCaches(user.id);
 
       return {
         message: 'Mobile recharge completed successfully',

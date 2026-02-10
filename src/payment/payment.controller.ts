@@ -22,8 +22,6 @@ import { RedisService } from 'src/common/services/redis.service';
 @ApiBearerAuth()
 @UseGuards(AuthGuard)
 export class PaymentController {
-  private readonly CACHE_TTL = 180;
-
   constructor(
     private readonly paymentService: PaymentService,
     private readonly redisService: RedisService,
@@ -40,9 +38,7 @@ export class PaymentController {
     @CurrentUser() user: User,
     @Body() ibftDto: IBFTTransferDto,
   ): Promise<ApiResponse<PaymentSelect>> {
-    const response = await this.paymentService.initiateIBFT(user, ibftDto);
-    await this.redisService.delete(`payment:${user.id}:history`);
-    return response;
+    return this.paymentService.initiateIBFT(user, ibftDto);
   }
 
   @Roles(...Object.values(UserRole))
@@ -56,9 +52,7 @@ export class PaymentController {
     @CurrentUser() user: User,
     @Body() raastDto: RAASTTransferDto,
   ): Promise<ApiResponse<PaymentSelect>> {
-    const response = await this.paymentService.initiateRaast(user, raastDto);
-    await this.redisService.delete(`payment:${user.id}:history`);
-    return response;
+    return this.paymentService.initiateRaast(user, raastDto);
   }
 
   @Roles(...Object.values(UserRole))
@@ -72,9 +66,7 @@ export class PaymentController {
     @CurrentUser() user: User,
     @Body() billDto: BillPaymentDto,
   ): Promise<ApiResponse<PaymentSelect>> {
-    const response = await this.paymentService.payBill(user, billDto);
-    await this.redisService.delete(`payment:${user.id}:history`);
-    return response;
+    return this.paymentService.payBill(user, billDto);
   }
 
   @Roles(...Object.values(UserRole))
@@ -88,9 +80,7 @@ export class PaymentController {
     @CurrentUser() user: User,
     @Body() rechargeDto: MobileRechargeDto,
   ): Promise<ApiResponse<PaymentSelect>> {
-    const response = await this.paymentService.mobileRecharge(user, rechargeDto);
-    await this.redisService.delete(`payment:${user.id}:history`);
-    return response;
+    return this.paymentService.mobileRecharge(user, rechargeDto);
   }
 
   @Roles(...Object.values(UserRole))
