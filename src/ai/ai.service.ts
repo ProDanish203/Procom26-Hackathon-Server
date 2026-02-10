@@ -10,8 +10,13 @@ export interface AIStreamTextResult {
 import { PrismaService } from 'src/common/services/prisma.service';
 import { AppLoggerService } from 'src/common/services/logger.service';
 import { throwError } from 'src/common/utils/helpers';
-import { createGetUserBankStatementTool } from './tools';
-import { BANKING_SYSTEM_PROMPT, BANK_STATEMENT_ANALYZER_PROMPT } from './prompts';
+import {
+  createGetUserBankStatementTool,
+  createListUserAccountsTool,
+  createGetRecentTransactionsTool,
+  createGetAccountBalanceTool,
+} from './tools';
+import { BANKING_SYSTEM_PROMPT, BANK_STATEMENT_ANALYZER_PROMPT, CHAT_ASSISTANT_SYSTEM_PROMPT } from './prompts';
 import { BankStatementAnalysisSchema, type BankStatementAnalysis } from './types';
 import type { User } from '@db';
 
@@ -44,10 +49,43 @@ export class AiService {
     };
   }
 
-  async generateText(options: { prompt: string; systemPrompt?: string; tools?: boolean; maxSteps?: number }) {
-    const { prompt, systemPrompt = BANKING_SYSTEM_PROMPT, tools: useTools = false, maxSteps = 5 } = options;
+  getToolsForUser(userId: string) {
+    return {
+      getUserBankStatement: createGetUserBankStatementTool(this.prismaService, userId),
+      listUserAccounts: createListUserAccountsTool(this.prismaService, userId),
+      getRecentTransactions: createGetRecentTransactionsTool(this.prismaService, userId),
+      getAccountBalance: createGetAccountBalanceTool(this.prismaService, userId),
+    };
+  }
+
+  async chatReply(userId: string, message: string): Promise<string> {
+    const result = await this.generateText({
+      prompt: message,
+      systemPrompt: CHAT_ASSISTANT_SYSTEM_PROMPT,
+      tools: true,
+      maxSteps: 5,
+      toolsOverride: this.getToolsForUser(userId),
+    });
+    return result.text ?? '';
+  }
+
+  async generateText(options: {
+    prompt: string;
+    systemPrompt?: string;
+    tools?: boolean;
+    maxSteps?: number;
+    toolsOverride?: ReturnType<AiService['getToolsForUser']>;
+  }) {
+    const {
+      prompt,
+      systemPrompt = BANKING_SYSTEM_PROMPT,
+      tools: useTools = false,
+      maxSteps = 5,
+      toolsOverride,
+    } = options;
     const model = this.getModel();
-    const tools = useTools ? this.getTools() : undefined;
+    const toolsRaw = useTools ? (toolsOverride ?? this.getTools()) : undefined;
+    const tools = toolsRaw as Parameters<typeof generateText>[0]['tools'];
 
     const result = await generateText({
       model,

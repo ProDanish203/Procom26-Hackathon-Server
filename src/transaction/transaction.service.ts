@@ -3,9 +3,9 @@ import { PrismaService } from 'src/common/services/prisma.service';
 import { AppLoggerService } from 'src/common/services/logger.service';
 import { ApiResponse } from 'src/common/types';
 import { throwError } from 'src/common/utils/helpers';
-import { TransferDto, GetTransactionsQueryDto, DepositDto } from './dto/transaction.dto';
+import { TransferDto, GetTransactionsQueryDto, DepositDto, GetBankStatementQueryDto } from './dto/transaction.dto';
 import { TransactionSelect, transactionSelect } from './queries';
-import { GetTransactionsResponse } from './types';
+import { GetTransactionsResponse, BankStatement, BankStatementAccount } from './types';
 import { User, Prisma, TransactionType, TransactionStatus, TransactionCategory, AccountStatus } from '@db';
 
 @Injectable()
@@ -18,6 +18,12 @@ export class TransactionService {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8).toUpperCase();
     return `TXN-${timestamp}-${random}`;
+  }
+
+  private generateStatementId(): string {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return `BST-${timestamp}-${random}`;
   }
 
   async getAccountTransactions(
@@ -285,6 +291,112 @@ export class TransactionService {
     } catch (err) {
       this.logger.error('Failed to deposit cash', err.stack, TransactionService.name);
       throw throwError(err.message || 'Failed to deposit cash', err.status || HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async getBankStatement(
+    user: User,
+    accountId: string,
+    query: GetBankStatementQueryDto,
+  ): Promise<ApiResponse<BankStatement>> {
+    try {
+      const account = await this.prismaService.account.findFirst({
+        where: {
+          id: accountId,
+          userId: user.id,
+        },
+        select: {
+          id: true,
+          accountNumber: true,
+          iban: true,
+          routingNumber: true,
+          accountType: true,
+          accountStatus: true,
+          balance: true,
+          currency: true,
+          nickname: true,
+          createdAt: true,
+        },
+      });
+
+      if (!account) {
+        throw throwError('Account not found', HttpStatus.NOT_FOUND);
+      }
+
+      const startDate = new Date(query.startDate);
+      const endDate = new Date(query.endDate);
+
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        throw throwError('Invalid date format. Use YYYY-MM-DD', HttpStatus.BAD_REQUEST);
+      }
+
+      if (startDate > endDate) {
+        throw throwError('Start date must be before or equal to end date', HttpStatus.BAD_REQUEST);
+      }
+
+      const transactions = await this.prismaService.transaction.findMany({
+        where: {
+          accountId,
+          createdAt: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        select: transactionSelect,
+        orderBy: { createdAt: 'asc' },
+      });
+
+      const openingBalance =
+        transactions.length > 0
+          ? Number(transactions[0].balanceAfter) - Number(transactions[0].amount)
+          : Number(account.balance);
+      const closingBalance = Number(account.balance);
+      const totalDeposits = transactions
+        .filter((t) => ['DEPOSIT', 'REFUND', 'INTEREST'].includes(t.type))
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      const totalWithdrawals = transactions
+        .filter((t) => ['WITHDRAWAL', 'PAYMENT', 'FEE', 'TRANSFER'].includes(t.type))
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+
+      const statementAccount: BankStatementAccount = {
+        id: account.id,
+        accountNumber: account.accountNumber,
+        iban: account.iban,
+        routingNumber: account.routingNumber,
+        accountType: account.accountType,
+        accountStatus: account.accountStatus,
+        balance: Number(account.balance),
+        currency: account.currency,
+        nickname: account.nickname,
+        createdAt: account.createdAt,
+      };
+
+      const statement: BankStatement = {
+        statementId: this.generateStatementId(),
+        generatedAt: new Date(),
+        account: statementAccount,
+        period: { startDate, endDate },
+        summary: {
+          openingBalance,
+          closingBalance,
+          totalDeposits,
+          totalWithdrawals,
+          transactionCount: transactions.length,
+        },
+        transactions,
+      };
+
+      return {
+        message: 'Bank statement retrieved successfully',
+        success: true,
+        data: statement,
+      };
+    } catch (err) {
+      this.logger.error('Failed to retrieve bank statement', err.stack, TransactionService.name);
+      throw throwError(
+        err.message || 'Failed to retrieve bank statement',
+        err.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

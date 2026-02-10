@@ -3,17 +3,25 @@ import { z } from 'zod';
 import type { PrismaService } from 'src/common/services/prisma.service';
 import { accountSelect } from 'src/account/queries';
 
-export function createGetUserBankStatementTool(prisma: PrismaService) {
+const statementInputSchema = z.object({
+  accountId: z.string().uuid().describe('The account ID (UUID) to fetch statement for'),
+  startDate: z.string().describe('Start date in YYYY-MM-DD format'),
+  endDate: z.string().describe('End date in YYYY-MM-DD format'),
+});
+
+const statementInputSchemaWithUserId = statementInputSchema.extend({
+  userId: z.string().uuid().describe('The user ID (UUID) who owns the account'),
+});
+
+export function createGetUserBankStatementTool(prisma: PrismaService, boundUserId?: string) {
+  const userId = boundUserId;
   return tool({
     description:
       'Get the bank statement for a user account within a date range. Use this to fetch transaction history and account summary from the database.',
-    inputSchema: z.object({
-      userId: z.string().uuid().describe('The user ID (UUID) who owns the account'),
-      accountId: z.string().uuid().describe('The account ID (UUID) to fetch statement for'),
-      startDate: z.string().describe('Start date in YYYY-MM-DD format'),
-      endDate: z.string().describe('End date in YYYY-MM-DD format'),
-    }),
-    execute: async ({ userId, accountId, startDate, endDate }) => {
+    inputSchema: userId ? statementInputSchema : statementInputSchemaWithUserId,
+    execute: async (input) => {
+      const { accountId, startDate, endDate } = input;
+      const resolvedUserId = userId ?? (input as z.infer<typeof statementInputSchemaWithUserId>).userId;
       const start = new Date(startDate);
       const end = new Date(endDate);
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
@@ -21,7 +29,7 @@ export function createGetUserBankStatementTool(prisma: PrismaService) {
       }
 
       const account = await prisma.account.findFirst({
-        where: { id: accountId, userId },
+        where: { id: accountId, userId: resolvedUserId },
         select: accountSelect,
       });
 

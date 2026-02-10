@@ -13,9 +13,9 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { User, UserRole } from '@db';
 import { ApiResponse } from 'src/common/types';
 import { TransactionService } from './transaction.service';
-import { TransferDto, GetTransactionsQueryDto, DepositDto } from './dto/transaction.dto';
+import { TransferDto, GetTransactionsQueryDto, DepositDto, GetBankStatementQueryDto } from './dto/transaction.dto';
 import { TransactionSelect } from './queries';
-import { GetTransactionsResponse } from './types';
+import { GetTransactionsResponse, BankStatement } from './types';
 import { RedisService } from 'src/common/services/redis.service';
 
 @Controller('transaction')
@@ -39,6 +39,78 @@ export class TransactionController {
     // Simple cache invalidation - delete common patterns
     // In production, consider using cache tags or more sophisticated invalidation
     await this.redisService.delete(`transaction:${userId}:account`);
+  }
+
+  @Roles(...Object.values(UserRole))
+  @Get('account/:accountId/bank-statement')
+  @ApiProperty({
+    title: 'Get Bank Statement',
+    description: 'Get a full bank statement for an account within a date range for export',
+  })
+  @ApiParam({ name: 'accountId', type: String, description: 'Account ID (UUID)' })
+  @ApiQuery({
+    name: 'startDate',
+    type: String,
+    required: true,
+    example: '2026-01-01',
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    type: String,
+    required: true,
+    example: '2026-01-31',
+    description: 'End date (YYYY-MM-DD)',
+  })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Bank statement retrieved successfully',
+    schema: {
+      example: {
+        message: 'Bank statement retrieved successfully',
+        success: true,
+        data: {
+          statementId: 'BST-1707598800-ABC123',
+          generatedAt: '2026-02-10T12:00:00.000Z',
+          account: {
+            id: 'uuid',
+            accountNumber: '1234567890',
+            accountType: 'SAVINGS',
+            accountStatus: 'ACTIVE',
+            balance: 25000,
+            currency: 'PKR',
+            nickname: 'Main',
+          },
+          period: { startDate: '2026-01-01', endDate: '2026-01-31' },
+          summary: {
+            openingBalance: 5000,
+            closingBalance: 25000,
+            totalDeposits: 22000,
+            totalWithdrawals: 2000,
+            transactionCount: 15,
+          },
+          transactions: [],
+        },
+      },
+    },
+  })
+  @SwaggerResponse({ status: 400, description: 'Invalid date format or start date after end date' })
+  @SwaggerResponse({ status: 404, description: 'Account not found or does not belong to user' })
+  @SwaggerResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
+  async getBankStatement(
+    @CurrentUser() user: User,
+    @Param('accountId') accountId: string,
+    @Query() query: GetBankStatementQueryDto,
+  ): Promise<ApiResponse<BankStatement>> {
+    const cacheKey = this.getCacheKey(user.id, 'bank-statement', accountId, query.startDate, query.endDate);
+
+    const cached = await this.redisService.get<ApiResponse<BankStatement>>(cacheKey);
+    if (cached) return cached;
+
+    const response = await this.transactionService.getBankStatement(user, accountId, query);
+    await this.redisService.set(cacheKey, response, this.CACHE_TTL);
+
+    return response;
   }
 
   @Roles(...Object.values(UserRole))
