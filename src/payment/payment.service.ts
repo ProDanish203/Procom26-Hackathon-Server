@@ -57,17 +57,19 @@ export class PaymentService {
 
       const fee = this.calculateFee(PaymentType.IBFT_TRANSFER);
       const totalAmount = amount + fee;
+      const currentBalance = Number(account.balance);
 
-      if (Number(account.balance) < totalAmount) {
+      if (currentBalance < totalAmount) {
         throw throwError('Insufficient balance', HttpStatus.BAD_REQUEST);
       }
 
       const reference = this.generateReference();
+      const newBalance = new Prisma.Decimal(currentBalance - totalAmount);
 
       const payment = await this.prismaService.$transaction(async (prisma) => {
         await prisma.account.update({
           where: { id: accountId },
-          data: { balance: Number(account.balance) - totalAmount },
+          data: { balance: newBalance },
         });
 
         return await prisma.payment.create({
@@ -77,9 +79,9 @@ export class PaymentService {
             beneficiaryId,
             paymentType: PaymentType.IBFT_TRANSFER,
             paymentStatus: PaymentStatus.PROCESSING,
-            amount,
-            fee,
-            totalAmount,
+            amount: new Prisma.Decimal(amount),
+            fee: new Prisma.Decimal(fee),
+            totalAmount: new Prisma.Decimal(totalAmount),
             currency: 'PKR',
             recipientName,
             recipientAccount,
@@ -119,17 +121,19 @@ export class PaymentService {
 
       const fee = this.calculateFee(PaymentType.RAAST_TRANSFER);
       const totalAmount = amount + fee;
+      const currentBalance = Number(account.balance);
 
-      if (Number(account.balance) < totalAmount) {
+      if (currentBalance < totalAmount) {
         throw throwError('Insufficient balance', HttpStatus.BAD_REQUEST);
       }
 
       const reference = this.generateReference();
+      const newBalance = new Prisma.Decimal(currentBalance - totalAmount);
 
       const payment = await this.prismaService.$transaction(async (prisma) => {
         await prisma.account.update({
           where: { id: accountId },
-          data: { balance: Number(account.balance) - totalAmount },
+          data: { balance: newBalance },
         });
 
         return await prisma.payment.create({
@@ -139,9 +143,9 @@ export class PaymentService {
             beneficiaryId,
             paymentType: PaymentType.RAAST_TRANSFER,
             paymentStatus: PaymentStatus.COMPLETED,
-            amount,
-            fee,
-            totalAmount,
+            amount: new Prisma.Decimal(amount),
+            fee: new Prisma.Decimal(fee),
+            totalAmount: new Prisma.Decimal(totalAmount),
             currency: 'PKR',
             recipientName,
             recipientIban,
@@ -181,17 +185,19 @@ export class PaymentService {
 
       const fee = this.calculateFee(PaymentType.UTILITY_BILL);
       const totalAmount = amount + fee;
+      const currentBalance = Number(account.balance);
 
-      if (Number(account.balance) < totalAmount) {
+      if (currentBalance < totalAmount) {
         throw throwError('Insufficient balance', HttpStatus.BAD_REQUEST);
       }
 
       const reference = this.generateReference();
+      const newBalance = new Prisma.Decimal(currentBalance - totalAmount);
 
       const payment = await this.prismaService.$transaction(async (prisma) => {
         await prisma.account.update({
           where: { id: accountId },
-          data: { balance: Number(account.balance) - totalAmount },
+          data: { balance: newBalance },
         });
 
         return await prisma.payment.create({
@@ -201,14 +207,14 @@ export class PaymentService {
             beneficiaryId,
             paymentType: PaymentType.UTILITY_BILL,
             paymentStatus: PaymentStatus.COMPLETED,
-            amount,
-            fee,
-            totalAmount,
+            amount: new Prisma.Decimal(amount),
+            fee: new Prisma.Decimal(fee),
+            totalAmount: new Prisma.Decimal(totalAmount),
             currency: 'PKR',
             recipientName: billerName,
             billerName,
             consumerNumber,
-            billAmount: amount,
+            billAmount: new Prisma.Decimal(amount),
             billMonth,
             dueDate: dueDate ? new Date(dueDate) : undefined,
             description: `Bill payment for ${billerName}`,
@@ -247,17 +253,19 @@ export class PaymentService {
 
       const fee = this.calculateFee(PaymentType.MOBILE_RECHARGE);
       const totalAmount = amount + fee;
+      const currentBalance = Number(account.balance);
 
-      if (Number(account.balance) < totalAmount) {
+      if (currentBalance < totalAmount) {
         throw throwError('Insufficient balance', HttpStatus.BAD_REQUEST);
       }
 
       const reference = this.generateReference();
+      const newBalance = new Prisma.Decimal(currentBalance - totalAmount);
 
       const payment = await this.prismaService.$transaction(async (prisma) => {
         await prisma.account.update({
           where: { id: accountId },
-          data: { balance: Number(account.balance) - totalAmount },
+          data: { balance: newBalance },
         });
 
         return await prisma.payment.create({
@@ -266,9 +274,9 @@ export class PaymentService {
             accountId,
             paymentType: PaymentType.MOBILE_RECHARGE,
             paymentStatus: PaymentStatus.COMPLETED,
-            amount,
-            fee,
-            totalAmount,
+            amount: new Prisma.Decimal(amount),
+            fee: new Prisma.Decimal(fee),
+            totalAmount: new Prisma.Decimal(totalAmount),
             currency: 'PKR',
             recipientName: mobileNumber,
             mobileNumber,
