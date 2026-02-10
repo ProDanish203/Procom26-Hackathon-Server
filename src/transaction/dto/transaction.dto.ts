@@ -101,3 +101,15 @@ export class GetTransactionsQueryDto {
   @ApiProperty({ type: String, required: false, example: 'coffee' })
   search?: string;
 }
+
+export class GetBankStatementQueryDto {
+  @IsNotEmpty({ message: 'Start date is required' })
+  @IsDateString({}, { message: 'Start date must be a valid date (YYYY-MM-DD)' })
+  @ApiProperty({ type: String, required: true, example: '2026-01-01', description: 'Start date (YYYY-MM-DD)' })
+  startDate: string;
+
+  @IsNotEmpty({ message: 'End date is required' })
+  @IsDateString({}, { message: 'End date must be a valid date (YYYY-MM-DD)' })
+  @ApiProperty({ type: String, required: true, example: '2026-01-31', description: 'End date (YYYY-MM-DD)' })
+  endDate: string;
+}
