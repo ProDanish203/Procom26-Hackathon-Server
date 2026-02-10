@@ -98,10 +98,7 @@ export class BeneficiaryService {
       };
     } catch (err) {
       this.logger.error('Failed to retrieve beneficiary', err.stack, BeneficiaryService.name);
-      throw throwError(
-        err.message || 'Failed to retrieve beneficiary',
-        err.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw throwError(err.message || 'Failed to retrieve beneficiary', err.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -137,10 +134,7 @@ export class BeneficiaryService {
       };
     } catch (err) {
       this.logger.error('Failed to update beneficiary', err.stack, BeneficiaryService.name);
-      throw throwError(
-        err.message || 'Failed to update beneficiary',
-        err.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw throwError(err.message || 'Failed to update beneficiary', err.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -170,10 +164,7 @@ export class BeneficiaryService {
       };
     } catch (err) {
       this.logger.error('Failed to delete beneficiary', err.stack, BeneficiaryService.name);
-      throw throwError(
-        err.message || 'Failed to delete beneficiary',
-        err.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw throwError(err.message || 'Failed to delete beneficiary', err.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

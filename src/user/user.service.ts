@@ -122,8 +122,7 @@ export class UserService {
 
       if (!existingUser) throw throwError('User not found', HttpStatus.NOT_FOUND);
 
-      const { name, gender, age, address, city, state, country, postalCode, phone, website, bio } =
-        updateUserDto;
+      const { name, gender, age, address, city, state, country, postalCode, phone, website, bio } = updateUserDto;
 
       const userUpdateData: Prisma.UserUpdateInput = {};
       if (name !== undefined) userUpdateData.name = name;

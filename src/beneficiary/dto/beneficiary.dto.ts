@@ -1,13 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  ValidateIf,
-  Matches,
-  IsBoolean,
-} from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, ValidateIf, Matches, IsBoolean } from 'class-validator';
 import { BeneficiaryType } from '@db';
 
 export class AddBeneficiaryDto {
@@ -22,7 +14,9 @@ export class AddBeneficiaryDto {
   nickname: string;
 
   // Bank transfer fields
-  @ValidateIf((o) => o.beneficiaryType === BeneficiaryType.DESI_BANK || o.beneficiaryType === BeneficiaryType.OTHER_BANK)
+  @ValidateIf(
+    (o) => o.beneficiaryType === BeneficiaryType.DESI_BANK || o.beneficiaryType === BeneficiaryType.OTHER_BANK,
+  )
   @IsNotEmpty({ message: 'Account number is required for bank transfers' })
   @IsString()
   @ApiProperty({ type: String, required: false, example: '1234567890' })
@@ -41,7 +35,12 @@ export class AddBeneficiaryDto {
   @ApiProperty({ type: String, required: false, example: 'HBL' })
   bankName?: string;
 
-  @ValidateIf((o) => o.beneficiaryType === BeneficiaryType.DESI_BANK || o.beneficiaryType === BeneficiaryType.OTHER_BANK || o.beneficiaryType === BeneficiaryType.RAAST)
+  @ValidateIf(
+    (o) =>
+      o.beneficiaryType === BeneficiaryType.DESI_BANK ||
+      o.beneficiaryType === BeneficiaryType.OTHER_BANK ||
+      o.beneficiaryType === BeneficiaryType.RAAST,
+  )
   @IsOptional()
   @IsString()
   @ApiProperty({ type: String, required: false, example: 'Muhammad Ali' })

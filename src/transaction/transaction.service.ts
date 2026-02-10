@@ -121,10 +121,7 @@ export class TransactionService {
       };
     } catch (err) {
       this.logger.error('Failed to retrieve transaction', err.stack, TransactionService.name);
-      throw throwError(
-        err.message || 'Failed to retrieve transaction',
-        err.status || HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw throwError(err.message || 'Failed to retrieve transaction', err.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
