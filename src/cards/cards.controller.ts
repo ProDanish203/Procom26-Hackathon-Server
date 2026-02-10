@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import {
   ApiProperty,
   ApiQuery,
@@ -212,18 +203,9 @@ export class CardsController {
     @Query() query: GetCardPaymentHistoryQueryDto,
   ): Promise<ApiResponse<GetCardPaymentHistoryResponse>> {
     const { page, limit, startDate, endDate } = query;
-    const cacheKey = this.getCacheKey(
-      user.id,
-      'payment-history',
-      id,
-      String(page),
-      String(limit),
-      startDate,
-      endDate,
-    );
+    const cacheKey = this.getCacheKey(user.id, 'payment-history', id, String(page), String(limit), startDate, endDate);
 
-    const cached =
-      await this.redisService.get<ApiResponse<GetCardPaymentHistoryResponse>>(cacheKey);
+    const cached = await this.redisService.get<ApiResponse<GetCardPaymentHistoryResponse>>(cacheKey);
     if (cached) return cached;
 
     const response = await this.cardsService.getCreditCardPaymentHistory(user, id, query);
@@ -242,10 +224,7 @@ export class CardsController {
   @SwaggerResponse({ status: 200, description: 'Card retrieved successfully' })
   @SwaggerResponse({ status: 404, description: 'Card not found or does not belong to user' })
   @SwaggerResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
-  async getCardById(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-  ): Promise<ApiResponse<CardMaskedDto>> {
+  async getCardById(@CurrentUser() user: User, @Param('id') id: string): Promise<ApiResponse<CardMaskedDto>> {
     const cacheKey = this.getCacheKey(user.id, 'detail', id);
 
     const cached = await this.redisService.get<ApiResponse<CardMaskedDto>>(cacheKey);

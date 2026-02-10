@@ -41,10 +41,7 @@ export class PaymentController {
   @SwaggerResponse({ status: 400, description: 'Bad request - Insufficient balance or inactive account' })
   @SwaggerResponse({ status: 404, description: 'Account not found' })
   @SwaggerResponse({ status: 401, description: 'Unauthorized' })
-  async initiateIBFT(
-    @CurrentUser() user: User,
-    @Body() ibftDto: IBFTTransferDto,
-  ): Promise<ApiResponse<PaymentSelect>> {
+  async initiateIBFT(@CurrentUser() user: User, @Body() ibftDto: IBFTTransferDto): Promise<ApiResponse<PaymentSelect>> {
     return this.paymentService.initiateIBFT(user, ibftDto);
   }
 
@@ -76,10 +73,7 @@ export class PaymentController {
   @SwaggerResponse({ status: 400, description: 'Bad request - Insufficient balance or inactive account' })
   @SwaggerResponse({ status: 404, description: 'Account not found' })
   @SwaggerResponse({ status: 401, description: 'Unauthorized' })
-  async payBill(
-    @CurrentUser() user: User,
-    @Body() billDto: BillPaymentDto,
-  ): Promise<ApiResponse<PaymentSelect>> {
+  async payBill(@CurrentUser() user: User, @Body() billDto: BillPaymentDto): Promise<ApiResponse<PaymentSelect>> {
     return this.paymentService.payBill(user, billDto);
   }
 
