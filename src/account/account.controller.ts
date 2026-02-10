@@ -1,5 +1,12 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
-import { ApiProperty, ApiQuery, ApiTags, ApiParam, ApiResponse as SwaggerResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiQuery,
+  ApiTags,
+  ApiParam,
+  ApiResponse as SwaggerResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { AuthGuard } from 'src/common/guards/auth.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
@@ -30,10 +37,7 @@ export class AccountController {
 
   private async invalidateAccountCache(userId: string): Promise<void> {
     // Invalidate common cache keys
-    const keysToDelete = [
-      this.getCacheKey(userId, 'all'),
-      this.getCacheKey(userId, 'dashboard'),
-    ];
+    const keysToDelete = [this.getCacheKey(userId, 'all'), this.getCacheKey(userId, 'dashboard')];
     await this.redisService.deleteMany(keysToDelete);
   }
 
@@ -75,24 +79,31 @@ export class AccountController {
 
   @Roles(...Object.values(UserRole))
   @Get('dashboard')
-  @ApiProperty({ title: 'Get Account Dashboard', description: 'Get dashboard with all accounts, summary, and recent transactions' })
-  @SwaggerResponse({ status: 200, description: 'Dashboard data retrieved successfully', schema: {
-    example: {
-      message: 'Dashboard data retrieved successfully',
-      success: true,
-      data: {
-        accounts: [],
-        summary: {
-          totalBalance: 20000,
-          totalAccounts: 1,
-          activeAccounts: 1,
-          totalCreditLimit: 0,
-          totalAvailableCredit: 0
+  @ApiProperty({
+    title: 'Get Account Dashboard',
+    description: 'Get dashboard with all accounts, summary, and recent transactions',
+  })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Dashboard data retrieved successfully',
+    schema: {
+      example: {
+        message: 'Dashboard data retrieved successfully',
+        success: true,
+        data: {
+          accounts: [],
+          summary: {
+            totalBalance: 20000,
+            totalAccounts: 1,
+            activeAccounts: 1,
+            totalCreditLimit: 0,
+            totalAvailableCredit: 0,
+          },
+          recentTransactions: [],
         },
-        recentTransactions: []
-      }
-    }
-  }})
+      },
+    },
+  })
   @SwaggerResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
   async getAccountDashboard(@CurrentUser() user: User): Promise<ApiResponse<DashboardData>> {
     const cacheKey = this.getCacheKey(user.id, 'dashboard');
@@ -127,7 +138,11 @@ export class AccountController {
 
   @Roles(...Object.values(UserRole))
   @Put(':id')
-  @ApiProperty({ title: 'Update Account', description: 'Update account details (nickname or status)', type: UpdateAccountDto })
+  @ApiProperty({
+    title: 'Update Account',
+    description: 'Update account details (nickname or status)',
+    type: UpdateAccountDto,
+  })
   @ApiParam({ name: 'id', type: String, description: 'Account ID (UUID)' })
   @SwaggerResponse({ status: 200, description: 'Account updated successfully' })
   @SwaggerResponse({ status: 400, description: 'Bad request - Cannot update closed account' })
@@ -145,7 +160,10 @@ export class AccountController {
 
   @Roles(...Object.values(UserRole))
   @Delete(':id')
-  @ApiProperty({ title: 'Close Account', description: 'Close a bank account (soft delete). Account balance must be zero.' })
+  @ApiProperty({
+    title: 'Close Account',
+    description: 'Close a bank account (soft delete). Account balance must be zero.',
+  })
   @ApiParam({ name: 'id', type: String, description: 'Account ID (UUID)' })
   @SwaggerResponse({ status: 200, description: 'Account closed successfully' })
   @SwaggerResponse({ status: 400, description: 'Bad request - Account already closed or has non-zero balance' })
@@ -161,26 +179,42 @@ export class AccountController {
   @Get(':id/statement')
   @ApiProperty({ title: 'Get Account Statement', description: 'Get account statement for a specific date range' })
   @ApiParam({ name: 'id', type: String, description: 'Account ID (UUID)' })
-  @ApiQuery({ name: 'startDate', type: String, required: true, example: '2026-01-01', description: 'Start date (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'endDate', type: String, required: true, example: '2026-01-31', description: 'End date (YYYY-MM-DD)' })
-  @SwaggerResponse({ status: 200, description: 'Statement retrieved successfully', schema: {
-    example: {
-      message: 'Account statement retrieved successfully',
-      success: true,
-      data: {
-        account: {},
-        transactions: [],
-        period: { startDate: '2026-01-01', endDate: '2026-01-31' },
-        summary: {
-          openingBalance: 5000,
-          closingBalance: 4500,
-          totalDeposits: 1000,
-          totalWithdrawals: 1500,
-          transactionCount: 10
-        }
-      }
-    }
-  }})
+  @ApiQuery({
+    name: 'startDate',
+    type: String,
+    required: true,
+    example: '2026-01-01',
+    description: 'Start date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    type: String,
+    required: true,
+    example: '2026-01-31',
+    description: 'End date (YYYY-MM-DD)',
+  })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Statement retrieved successfully',
+    schema: {
+      example: {
+        message: 'Account statement retrieved successfully',
+        success: true,
+        data: {
+          account: {},
+          transactions: [],
+          period: { startDate: '2026-01-01', endDate: '2026-01-31' },
+          summary: {
+            openingBalance: 5000,
+            closingBalance: 4500,
+            totalDeposits: 1000,
+            totalWithdrawals: 1500,
+            transactionCount: 10,
+          },
+        },
+      },
+    },
+  })
   @SwaggerResponse({ status: 400, description: 'Bad request - Invalid date format' })
   @SwaggerResponse({ status: 404, description: 'Account not found or does not belong to user' })
   @SwaggerResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })

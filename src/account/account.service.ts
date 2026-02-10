@@ -304,7 +304,10 @@ export class AccountService {
         orderBy: { createdAt: 'asc' },
       });
 
-      const openingBalance = transactions.length > 0 ? Number(transactions[0].balanceAfter) - Number(transactions[0].amount) : Number(account.balance);
+      const openingBalance =
+        transactions.length > 0
+          ? Number(transactions[0].balanceAfter) - Number(transactions[0].amount)
+          : Number(account.balance);
       const closingBalance = Number(account.balance);
       const totalDeposits = transactions
         .filter((t) => ['DEPOSIT', 'REFUND', 'INTEREST'].includes(t.type))

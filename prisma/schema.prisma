@@ -47,7 +47,8 @@ model User {
   accounts    Account[]
   beneficiaries Beneficiary[]
   payments    Payment[]
-  
+  cards       Card[]
+
   @@index([name])
   @@index([email])
 }
@@ -198,13 +199,64 @@ model Account {
   updatedAt       DateTime      @updatedAt
   closedAt        DateTime?
   
+  // Credit card: minimum amount due per billing cycle
+  minimumPaymentDue Decimal?      @db.Decimal(15, 2)
+
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions    Transaction[]
   payments        Payment[]
-  
+  cards           Card[]
+
   @@index([userId])
   @@index([accountNumber])
   @@index([accountStatus])
+}
+
+enum CardType {
+  DEBIT
+  CREDIT
+}
+
+enum CardStatus {
+  ACTIVE
+  BLOCKED
+  INACTIVE
+}
+
+model Card {
+  id              String     @id @default(uuid()) @db.Uuid
+  userId          String     @db.Uuid
+  accountId      String     @db.Uuid
+
+  cardType        CardType
+  status          CardStatus @default(ACTIVE)
+
+  // Masked display (e.g. last 4 digits only; full number never stored)
+  lastFourDigits  String     // "1234"
+  expiryMonth     Int        // 1-12
+  expiryYear      Int        // e.g. 2028
+
+  // Debit: spending limits (optional)
+  spendingLimitDaily   Decimal?  @db.Decimal(15, 2)
+  spendingLimitMonthly Decimal?  @db.Decimal(15, 2)
+
+  // PIN: only track when last changed (never store PIN)
+  pinChangedAt    DateTime?
+
+  // Credit: rewards/points balance
+  rewardsPoints   Int       @default(0)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account         Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([cardType])
+  @@index([status])
 }
 
 enum TransactionType {
@@ -257,6 +309,9 @@ model Transaction {
   // For transfers
   toAccountId   String?             @db.Uuid
   fromAccountId String?             @db.Uuid
+
+  // For card statement (transactions made with this card)
+  cardId        String?             @db.Uuid
   
   metadata      Json?
   
@@ -265,8 +320,10 @@ model Transaction {
   completedAt   DateTime?
   
   account       Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  card          Card?               @relation(fields: [cardId], references: [id], onDelete: SetNull)
   
   @@index([accountId])
+  @@index([cardId])
   @@index([type])
   @@index([status])
   @@index([createdAt])

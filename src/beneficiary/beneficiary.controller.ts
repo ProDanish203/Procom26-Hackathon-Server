@@ -36,16 +36,17 @@ export class BeneficiaryController {
   }
 
   private async invalidateBeneficiaryCache(userId: string): Promise<void> {
-    const keysToDelete = [
-      this.getCacheKey(userId, 'all'),
-      this.getCacheKey(userId, 'favorites'),
-    ];
+    const keysToDelete = [this.getCacheKey(userId, 'all'), this.getCacheKey(userId, 'favorites')];
     await this.redisService.deleteMany(keysToDelete);
   }
 
   @Roles(...Object.values(UserRole))
   @Post()
-  @ApiProperty({ title: 'Add Beneficiary', description: 'Add a new beneficiary for transfers or payments', type: AddBeneficiaryDto })
+  @ApiProperty({
+    title: 'Add Beneficiary',
+    description: 'Add a new beneficiary for transfers or payments',
+    type: AddBeneficiaryDto,
+  })
   @SwaggerResponse({ status: 201, description: 'Beneficiary added successfully' })
   @SwaggerResponse({ status: 400, description: 'Bad request - Invalid data' })
   @SwaggerResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
@@ -140,10 +141,7 @@ export class BeneficiaryController {
   @SwaggerResponse({ status: 200, description: 'Favorite status updated successfully' })
   @SwaggerResponse({ status: 404, description: 'Beneficiary not found or does not belong to user' })
   @SwaggerResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
-  async toggleFavorite(
-    @CurrentUser() user: User,
-    @Param('id') id: string,
-  ): Promise<ApiResponse<BeneficiarySelect>> {
+  async toggleFavorite(@CurrentUser() user: User, @Param('id') id: string): Promise<ApiResponse<BeneficiarySelect>> {
     const response = await this.beneficiaryService.toggleFavorite(user, id);
     await this.invalidateBeneficiaryCache(user.id);
     return response;

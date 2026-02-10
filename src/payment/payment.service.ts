@@ -3,7 +3,13 @@ import { PrismaService } from 'src/common/services/prisma.service';
 import { AppLoggerService } from 'src/common/services/logger.service';
 import { ApiResponse } from 'src/common/types';
 import { throwError } from 'src/common/utils/helpers';
-import { IBFTTransferDto, RAASTTransferDto, BillPaymentDto, MobileRechargeDto, GetPaymentsQueryDto } from './dto/payment.dto';
+import {
+  IBFTTransferDto,
+  RAASTTransferDto,
+  BillPaymentDto,
+  MobileRechargeDto,
+  GetPaymentsQueryDto,
+} from './dto/payment.dto';
 import { PaymentSelect, paymentSelect } from './queries';
 import { GetPaymentsResponse } from './types';
 import { User, PaymentType, PaymentStatus, Prisma, AccountStatus } from '@db';
@@ -46,7 +52,8 @@ export class PaymentService {
       });
 
       if (!account) throw throwError('Account not found', HttpStatus.NOT_FOUND);
-      if (account.accountStatus !== AccountStatus.ACTIVE) throw throwError('Account is not active', HttpStatus.BAD_REQUEST);
+      if (account.accountStatus !== AccountStatus.ACTIVE)
+        throw throwError('Account is not active', HttpStatus.BAD_REQUEST);
 
       const fee = this.calculateFee(PaymentType.IBFT_TRANSFER);
       const totalAmount = amount + fee;
@@ -107,7 +114,8 @@ export class PaymentService {
       });
 
       if (!account) throw throwError('Account not found', HttpStatus.NOT_FOUND);
-      if (account.accountStatus !== AccountStatus.ACTIVE) throw throwError('Account is not active', HttpStatus.BAD_REQUEST);
+      if (account.accountStatus !== AccountStatus.ACTIVE)
+        throw throwError('Account is not active', HttpStatus.BAD_REQUEST);
 
       const fee = this.calculateFee(PaymentType.RAAST_TRANSFER);
       const totalAmount = amount + fee;
@@ -168,7 +176,8 @@ export class PaymentService {
       });
 
       if (!account) throw throwError('Account not found', HttpStatus.NOT_FOUND);
-      if (account.accountStatus !== AccountStatus.ACTIVE) throw throwError('Account is not active', HttpStatus.BAD_REQUEST);
+      if (account.accountStatus !== AccountStatus.ACTIVE)
+        throw throwError('Account is not active', HttpStatus.BAD_REQUEST);
 
       const fee = this.calculateFee(PaymentType.UTILITY_BILL);
       const totalAmount = amount + fee;
@@ -233,7 +242,8 @@ export class PaymentService {
       });
 
       if (!account) throw throwError('Account not found', HttpStatus.NOT_FOUND);
-      if (account.accountStatus !== AccountStatus.ACTIVE) throw throwError('Account is not active', HttpStatus.BAD_REQUEST);
+      if (account.accountStatus !== AccountStatus.ACTIVE)
+        throw throwError('Account is not active', HttpStatus.BAD_REQUEST);
 
       const fee = this.calculateFee(PaymentType.MOBILE_RECHARGE);
       const totalAmount = amount + fee;
