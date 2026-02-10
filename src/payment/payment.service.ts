@@ -1,7 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/common/services/prisma.service';
 import { AppLoggerService } from 'src/common/services/logger.service';
-import { RedisService } from 'src/common/services/redis.service';
 import { ApiResponse } from 'src/common/types';
 import { throwError } from 'src/common/utils/helpers';
 import { IBFTTransferDto, RAASTTransferDto, BillPaymentDto, MobileRechargeDto, GetPaymentsQueryDto } from './dto/payment.dto';
@@ -13,29 +12,12 @@ import { User, PaymentType, PaymentStatus, Prisma, AccountStatus } from '@db';
 export class PaymentService {
   private readonly logger = new AppLoggerService(PaymentService.name);
 
-  constructor(
-    private readonly prismaService: PrismaService,
-    private readonly redisService: RedisService,
-  ) {}
+  constructor(private readonly prismaService: PrismaService) {}
 
   private generateReference(): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2, 8).toUpperCase();
     return `PAY-${timestamp}-${random}`;
-  }
-
-  private async invalidatePaymentCaches(userId: string): Promise<void> {
-    // Invalidate account caches (balance changed)
-    await this.redisService.deleteMany([
-      `account:${userId}:all`,
-      `account:${userId}:dashboard`,
-    ]);
-
-    // Invalidate transaction caches (new payment transaction)
-    await this.redisService.delete(`transaction:${userId}:account`);
-
-    // Invalidate payment caches
-    await this.redisService.delete(`payment:${userId}:history`);
   }
 
   private calculateFee(paymentType: PaymentType): number {
@@ -107,9 +89,6 @@ export class PaymentService {
 
       this.logger.log(`IBFT transfer initiated: ${reference}`);
 
-      // Invalidate caches
-      await this.invalidatePaymentCaches(user.id);
-
       return {
         message: 'IBFT transfer initiated successfully. Processing time: 1-2 business days',
         success: true,
@@ -172,9 +151,6 @@ export class PaymentService {
       });
 
       this.logger.log(`RAAST transfer completed: ${reference}`);
-
-      // Invalidate caches
-      await this.invalidatePaymentCaches(user.id);
 
       return {
         message: 'RAAST transfer completed successfully',
@@ -243,9 +219,6 @@ export class PaymentService {
 
       this.logger.log(`Bill payment completed: ${reference}`);
 
-      // Invalidate caches
-      await this.invalidatePaymentCaches(user.id);
-
       return {
         message: 'Bill payment completed successfully',
         success: true,
@@ -308,9 +281,6 @@ export class PaymentService {
       });
 
       this.logger.log(`Mobile recharge completed: ${reference}`);
-
-      // Invalidate caches
-      await this.invalidatePaymentCaches(user.id);
 
       return {
         message: 'Mobile recharge completed successfully',
