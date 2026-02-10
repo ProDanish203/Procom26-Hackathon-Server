@@ -44,6 +44,9 @@ model User {
   verificationTokens VerificationToken[]
 
   userProfile UserProfile? @relation("UserProfile")
+  accounts    Account[]
+  beneficiaries Beneficiary[]
+  payments    Payment[]
   
   @@index([name])
   @@index([email])
@@ -156,4 +159,242 @@ model UserProfile {
   user User @relation("UserProfile", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+enum AccountType {
+  CURRENT
+  SAVINGS
+  CREDIT_CARD
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  FROZEN
+  CLOSED
+}
+
+model Account {
+  id              String        @id @default(uuid()) @db.Uuid
+  userId          String        @db.Uuid
+  accountNumber   String        @unique
+  iban            String?       @unique
+  routingNumber   String?
+  
+  accountType     AccountType
+  accountStatus   AccountStatus @default(ACTIVE)
+  
+  balance         Decimal       @default(0) @db.Decimal(15, 2)
+  currency        String        @default("PKR")
+  
+  // Credit Card specific
+  creditLimit     Decimal?      @default(5000000) @db.Decimal(15, 2)
+  availableCredit Decimal?      @db.Decimal(15, 2)
+  dueDate         DateTime?
+  
+  nickname        String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  closedAt        DateTime?
+  
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+  payments        Payment[]
+  
+  @@index([userId])
+  @@index([accountNumber])
+  @@index([accountStatus])
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  PAYMENT
+  REFUND
+  FEE
+  INTEREST
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TransactionCategory {
+  GROCERIES
+  DINING
+  TRANSPORTATION
+  UTILITIES
+  ENTERTAINMENT
+  HEALTHCARE
+  SHOPPING
+  SALARY
+  TRANSFER
+  OTHER
+}
+
+model Transaction {
+  id            String              @id @default(uuid()) @db.Uuid
+  accountId     String              @db.Uuid
+  
+  type          TransactionType
+  status        TransactionStatus   @default(PENDING)
+  category      TransactionCategory @default(OTHER)
+  
+  amount        Decimal             @db.Decimal(15, 2)
+  currency      String              @default("PKR")
+  
+  balanceAfter  Decimal             @db.Decimal(15, 2)
+  
+  description   String
+  merchant      String?
+  reference     String?             @unique
+  
+  // For transfers
+  toAccountId   String?             @db.Uuid
+  fromAccountId String?             @db.Uuid
+  
+  metadata      Json?
+  
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  completedAt   DateTime?
+  
+  account       Account             @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  @@index([accountId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([reference])
+}
+
+enum BeneficiaryType {
+  DESI_BANK
+  OTHER_BANK
+  RAAST
+  BILLER
+  MOBILE
+}
+
+model Beneficiary {
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String          @db.Uuid
+  
+  beneficiaryType BeneficiaryType
+  nickname        String
+  
+  // For bank transfers
+  accountNumber   String?
+  iban            String?
+  bankName        String?
+  accountTitle    String?
+  
+  // For bill payments
+  consumerNumber  String?
+  billerName      String?
+  billerCategory  String?
+  
+  // For mobile recharge
+  mobileNumber    String?
+  mobileOperator  String?
+  
+  isActive        Boolean         @default(true)
+  isFavorite      Boolean         @default(false)
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments        Payment[]
+  
+  @@index([userId])
+  @@index([beneficiaryType])
+}
+
+enum PaymentType {
+  INTERBANK_TRANSFER
+  IBFT_TRANSFER
+  RAAST_TRANSFER
+  UTILITY_BILL
+  TELECOM_BILL
+  CREDIT_CARD_PAYMENT
+  EDUCATION_FEE
+  TAX_PAYMENT
+  INSURANCE_PREMIUM
+  MOBILE_RECHARGE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+model Payment {
+  id              String        @id @default(uuid()) @db.Uuid
+  userId          String        @db.Uuid
+  accountId       String        @db.Uuid
+  beneficiaryId   String?       @db.Uuid
+  
+  paymentType     PaymentType
+  paymentStatus   PaymentStatus @default(PENDING)
+  
+  amount          Decimal       @db.Decimal(15, 2)
+  fee             Decimal       @default(0) @db.Decimal(10, 2)
+  totalAmount     Decimal       @db.Decimal(15, 2)
+  currency        String        @default("PKR")
+  
+  // Recipient details
+  recipientName   String
+  recipientAccount String?
+  recipientIban   String?
+  recipientBank   String?
+  
+  // Bill payment details
+  consumerNumber  String?
+  billerName      String?
+  billMonth       String?
+  billAmount      Decimal?      @db.Decimal(15, 2)
+  dueDate         DateTime?
+  
+  // Mobile recharge details
+  mobileNumber    String?
+  mobileOperator  String?
+  
+  description     String
+  reference       String        @unique
+  transactionId   String?
+  
+  receiptUrl      String?
+  
+  metadata        Json?
+  
+  failureReason   String?
+  
+  scheduledAt     DateTime?
+  processedAt     DateTime?
+  completedAt     DateTime?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account         Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  beneficiary     Beneficiary?  @relation(fields: [beneficiaryId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([accountId])
+  @@index([paymentType])
+  @@index([paymentStatus])
+  @@index([reference])
+  @@index([createdAt])
 }

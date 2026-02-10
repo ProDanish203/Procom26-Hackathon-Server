@@ -7,6 +7,10 @@ import { StorageModule } from './storage/storage.module';
 import { UserModule } from './user/user.module';
 import { MailerModule } from './mailer/mailer.module';
 import { BullMQModule } from './common/modules/bullmq.module';
+import { AccountModule } from './account/account.module';
+import { TransactionModule } from './transaction/transaction.module';
+import { BeneficiaryModule } from './beneficiary/beneficiary.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -18,6 +22,10 @@ import { BullMQModule } from './common/modules/bullmq.module';
     StorageModule,
     UserModule,
     MailerModule,
+    AccountModule,
+    TransactionModule,
+    BeneficiaryModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

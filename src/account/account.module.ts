@@ -1,0 +1,12 @@
+import { Module } from '@nestjs/common';
+import { AccountController } from './account.controller';
+import { AccountService } from './account.service';
+import { PrismaService } from 'src/common/services/prisma.service';
+import { RedisService } from 'src/common/services/redis.service';
+
+@Module({
+  controllers: [AccountController],
+  providers: [AccountService, PrismaService, RedisService],
+  exports: [AccountService],
+})
+export class AccountModule {}
