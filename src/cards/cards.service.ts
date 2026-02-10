@@ -88,11 +88,7 @@ export class CardsService {
     }
   }
 
-  async updateCardStatus(
-    user: User,
-    cardId: string,
-    dto: UpdateCardStatusDto,
-  ): Promise<ApiResponse<CardSelect>> {
+  async updateCardStatus(user: User, cardId: string, dto: UpdateCardStatusDto): Promise<ApiResponse<CardSelect>> {
     try {
       await this.getCardForUser(user, cardId);
 
@@ -115,11 +111,7 @@ export class CardsService {
     }
   }
 
-  async setSpendingLimits(
-    user: User,
-    cardId: string,
-    dto: SetSpendingLimitsDto,
-  ): Promise<ApiResponse<CardSelect>> {
+  async setSpendingLimits(user: User, cardId: string, dto: SetSpendingLimitsDto): Promise<ApiResponse<CardSelect>> {
     try {
       const card = await this.getCardForUser(user, cardId);
 

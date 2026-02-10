@@ -1,14 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsEnum,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsPositive,
-  Min,
-  Max,
-  IsDateString,
-} from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsPositive, Min, Max, IsDateString } from 'class-validator';
 import { CardStatus } from '@db';
 
 export class UpdateCardStatusDto {
