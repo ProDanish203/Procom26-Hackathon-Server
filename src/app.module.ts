@@ -13,6 +13,7 @@ import { BeneficiaryModule } from './beneficiary/beneficiary.module';
 import { PaymentModule } from './payment/payment.module';
 import { CardsModule } from './cards/cards.module';
 import { ChatModule } from './chat/chat.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ChatModule } from './chat/chat.module';
     PaymentModule,
     CardsModule,
     ChatModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
