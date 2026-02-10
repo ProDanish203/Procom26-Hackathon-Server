@@ -16,30 +16,13 @@ import { AccountService } from './account.service';
 import { CreateAccountDto, UpdateAccountDto } from './dto/account.dto';
 import { AccountSelect } from './queries';
 import { DashboardData, AccountStatement } from './types';
-import { RedisService } from 'src/common/services/redis.service';
 
 @Controller('account')
 @ApiTags('Account Management')
 @ApiBearerAuth()
 @UseGuards(AuthGuard)
 export class AccountController {
-  private readonly CACHE_TTL = 300;
-
-  constructor(
-    private readonly accountService: AccountService,
-    private readonly redisService: RedisService,
-  ) {}
-
-  private getCacheKey(userId: string, prefix: string, ...params: (string | number | undefined)[]): string {
-    const keyParts = params.filter((p) => p !== undefined && p !== null && p !== '');
-    return `account:${userId}:${prefix}:${keyParts.join(':')}`;
-  }
-
-  private async invalidateAccountCache(userId: string): Promise<void> {
-    // Invalidate common cache keys
-    const keysToDelete = [this.getCacheKey(userId, 'all'), this.getCacheKey(userId, 'dashboard')];
-    await this.redisService.deleteMany(keysToDelete);
-  }
+  constructor(private readonly accountService: AccountService) {}
 
   @Roles(...Object.values(UserRole))
   @Post()
@@ -51,9 +34,7 @@ export class AccountController {
     @CurrentUser() user: User,
     @Body() createAccountDto: CreateAccountDto,
   ): Promise<ApiResponse<AccountSelect>> {
-    const response = await this.accountService.createAccount(user, createAccountDto);
-    await this.invalidateAccountCache(user.id);
-    return response;
+    return this.accountService.createAccount(user, createAccountDto);
   }
 
   @Roles(...Object.values(UserRole))
@@ -66,15 +47,7 @@ export class AccountController {
     @CurrentUser() user: User,
     @Query('status') status?: AccountStatus,
   ): Promise<ApiResponse<AccountSelect[]>> {
-    const cacheKey = this.getCacheKey(user.id, 'all', status);
-
-    const cached = await this.redisService.get<ApiResponse<AccountSelect[]>>(cacheKey);
-    if (cached) return cached;
-
-    const response = await this.accountService.getAllUserAccounts(user, status);
-    await this.redisService.set(cacheKey, response, this.CACHE_TTL);
-
-    return response;
+    return this.accountService.getAllUserAccounts(user, status);
   }
 
   @Roles(...Object.values(UserRole))
@@ -106,15 +79,7 @@ export class AccountController {
   })
   @SwaggerResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
   async getAccountDashboard(@CurrentUser() user: User): Promise<ApiResponse<DashboardData>> {
-    const cacheKey = this.getCacheKey(user.id, 'dashboard');
-
-    const cached = await this.redisService.get<ApiResponse<DashboardData>>(cacheKey);
-    if (cached) return cached;
-
-    const response = await this.accountService.getAccountDashboard(user);
-    await this.redisService.set(cacheKey, response, this.CACHE_TTL);
-
-    return response;
+    return this.accountService.getAccountDashboard(user);
   }
 
   @Roles(...Object.values(UserRole))
@@ -125,15 +90,7 @@ export class AccountController {
   @SwaggerResponse({ status: 404, description: 'Account not found or does not belong to user' })
   @SwaggerResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
   async getAccountById(@CurrentUser() user: User, @Param('id') id: string): Promise<ApiResponse<AccountSelect>> {
-    const cacheKey = this.getCacheKey(user.id, 'detail', id);
-
-    const cached = await this.redisService.get<ApiResponse<AccountSelect>>(cacheKey);
-    if (cached) return cached;
-
-    const response = await this.accountService.getAccountById(user, id);
-    await this.redisService.set(cacheKey, response, this.CACHE_TTL);
-
-    return response;
+    return this.accountService.getAccountById(user, id);
   }
 
   @Roles(...Object.values(UserRole))
@@ -153,9 +110,7 @@ export class AccountController {
     @Param('id') id: string,
     @Body() updateAccountDto: UpdateAccountDto,
   ): Promise<ApiResponse<AccountSelect>> {
-    const response = await this.accountService.updateAccount(user, id, updateAccountDto);
-    await this.invalidateAccountCache(user.id);
-    return response;
+    return this.accountService.updateAccount(user, id, updateAccountDto);
   }
 
   @Roles(...Object.values(UserRole))
@@ -170,9 +125,7 @@ export class AccountController {
   @SwaggerResponse({ status: 404, description: 'Account not found or does not belong to user' })
   @SwaggerResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
   async closeAccount(@CurrentUser() user: User, @Param('id') id: string): Promise<ApiResponse<void>> {
-    const response = await this.accountService.closeAccount(user, id);
-    await this.invalidateAccountCache(user.id);
-    return response;
+    return this.accountService.closeAccount(user, id);
   }
 
   @Roles(...Object.values(UserRole))

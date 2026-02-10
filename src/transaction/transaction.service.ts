@@ -165,8 +165,10 @@ export class TransactionService {
       const reference = this.generateReference();
 
       const result = await this.prismaService.$transaction(async (prisma) => {
-        const newFromBalance = Number(fromAccount.balance) - amount;
-        const newToBalance = Number(toAccount.balance) + amount;
+        const currentFromBalance = Number(fromAccount.balance);
+        const currentToBalance = Number(toAccount.balance);
+        const newFromBalance = new Prisma.Decimal(currentFromBalance - amount);
+        const newToBalance = new Prisma.Decimal(currentToBalance + amount);
 
         await prisma.account.update({
           where: { id: fromAccountId },
@@ -184,7 +186,7 @@ export class TransactionService {
             type: TransactionType.TRANSFER,
             status: TransactionStatus.COMPLETED,
             category: TransactionCategory.TRANSFER,
-            amount: -amount,
+            amount: new Prisma.Decimal(-amount),
             currency: fromAccount.currency,
             balanceAfter: newFromBalance,
             description: `Transfer to ${toAccount.accountNumber} - ${description}`,
@@ -202,7 +204,7 @@ export class TransactionService {
             type: TransactionType.TRANSFER,
             status: TransactionStatus.COMPLETED,
             category: TransactionCategory.TRANSFER,
-            amount: amount,
+            amount: new Prisma.Decimal(amount),
             currency: toAccount.currency,
             balanceAfter: newToBalance,
             description: `Transfer from ${fromAccount.accountNumber} - ${description}`,
@@ -246,7 +248,8 @@ export class TransactionService {
       }
 
       const reference = this.generateReference();
-      const newBalance = Number(account.balance) + amount;
+      const currentBalance = Number(account.balance);
+      const newBalance = new Prisma.Decimal(currentBalance + amount);
 
       const transaction = await this.prismaService.$transaction(async (prisma) => {
         await prisma.account.update({
@@ -260,7 +263,7 @@ export class TransactionService {
             type: TransactionType.DEPOSIT,
             status: TransactionStatus.COMPLETED,
             category: TransactionCategory.OTHER,
-            amount: amount,
+            amount: new Prisma.Decimal(amount),
             currency: account.currency,
             balanceAfter: newBalance,
             description: location ? `${description} - ${location}` : description,
