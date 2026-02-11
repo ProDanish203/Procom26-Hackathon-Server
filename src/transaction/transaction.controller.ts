@@ -16,30 +16,13 @@ import { TransactionService } from './transaction.service';
 import { TransferDto, GetTransactionsQueryDto, DepositDto, GetBankStatementQueryDto } from './dto/transaction.dto';
 import { TransactionSelect } from './queries';
 import { GetTransactionsResponse, BankStatement } from './types';
-import { RedisService } from 'src/common/services/redis.service';
 
 @Controller('transaction')
 @ApiTags('Transaction Management')
 @ApiBearerAuth()
 @UseGuards(AuthGuard)
 export class TransactionController {
-  private readonly CACHE_TTL = 180;
-
-  constructor(
-    private readonly transactionService: TransactionService,
-    private readonly redisService: RedisService,
-  ) {}
-
-  private getCacheKey(userId: string, prefix: string, ...params: (string | number | undefined)[]): string {
-    const keyParts = params.filter((p) => p !== undefined && p !== null && p !== '');
-    return `transaction:${userId}:${prefix}:${keyParts.join(':')}`;
-  }
-
-  private async invalidateTransactionCache(userId: string): Promise<void> {
-    // Simple cache invalidation - delete common patterns
-    // In production, consider using cache tags or more sophisticated invalidation
-    await this.redisService.delete(`transaction:${userId}:account`);
-  }
+  constructor(private readonly transactionService: TransactionService) {}
 
   @Roles(...Object.values(UserRole))
   @Get('account/:accountId/bank-statement')
@@ -102,15 +85,7 @@ export class TransactionController {
     @Param('accountId') accountId: string,
     @Query() query: GetBankStatementQueryDto,
   ): Promise<ApiResponse<BankStatement>> {
-    const cacheKey = this.getCacheKey(user.id, 'bank-statement', accountId, query.startDate, query.endDate);
-
-    const cached = await this.redisService.get<ApiResponse<BankStatement>>(cacheKey);
-    if (cached) return cached;
-
-    const response = await this.transactionService.getBankStatement(user, accountId, query);
-    await this.redisService.set(cacheKey, response, this.CACHE_TTL);
-
-    return response;
+    return this.transactionService.getBankStatement(user, accountId, query);
   }
 
   @Roles(...Object.values(UserRole))
@@ -173,28 +148,7 @@ export class TransactionController {
     @Param('accountId') accountId: string,
     @Query() query: GetTransactionsQueryDto,
   ): Promise<ApiResponse<GetTransactionsResponse>> {
-    const { page, limit, type, status, category, startDate, endDate, search } = query;
-    const cacheKey = this.getCacheKey(
-      user.id,
-      'account',
-      accountId,
-      page,
-      limit,
-      type,
-      status,
-      category,
-      startDate,
-      endDate,
-      search,
-    );
-
-    const cached = await this.redisService.get<ApiResponse<GetTransactionsResponse>>(cacheKey);
-    if (cached) return cached;
-
-    const response = await this.transactionService.getAccountTransactions(user, accountId, query);
-    await this.redisService.set(cacheKey, response, this.CACHE_TTL);
-
-    return response;
+    return this.transactionService.getAccountTransactions(user, accountId, query);
   }
 
   @Roles(...Object.values(UserRole))
@@ -208,15 +162,7 @@ export class TransactionController {
     @CurrentUser() user: User,
     @Param('id') id: string,
   ): Promise<ApiResponse<TransactionSelect>> {
-    const cacheKey = this.getCacheKey(user.id, 'detail', id);
-
-    const cached = await this.redisService.get<ApiResponse<TransactionSelect>>(cacheKey);
-    if (cached) return cached;
-
-    const response = await this.transactionService.getTransactionById(user, id);
-    await this.redisService.set(cacheKey, response, this.CACHE_TTL);
-
-    return response;
+    return this.transactionService.getTransactionById(user, id);
   }
 
   @Roles(...Object.values(UserRole))
@@ -257,14 +203,7 @@ export class TransactionController {
     @CurrentUser() user: User,
     @Body() depositDto: DepositDto,
   ): Promise<ApiResponse<TransactionSelect>> {
-    const response = await this.transactionService.depositCash(user, depositDto);
-    await this.invalidateTransactionCache(user.id);
-
-    // Also invalidate account cache
-    await this.redisService.delete(`account:${user.id}:all`);
-    await this.redisService.delete(`account:${user.id}:dashboard`);
-
-    return response;
+    return this.transactionService.depositCash(user, depositDto);
   }
 
   @Roles(...Object.values(UserRole))
@@ -310,13 +249,6 @@ export class TransactionController {
     @CurrentUser() user: User,
     @Body() transferDto: TransferDto,
   ): Promise<ApiResponse<TransactionSelect>> {
-    const response = await this.transactionService.createTransfer(user, transferDto);
-    await this.invalidateTransactionCache(user.id);
-
-    // Also invalidate account cache
-    await this.redisService.delete(`account:${user.id}:all`);
-    await this.redisService.delete(`account:${user.id}:dashboard`);
-
-    return response;
+    return this.transactionService.createTransfer(user, transferDto);
   }
 }
