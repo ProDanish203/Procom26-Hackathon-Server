@@ -15,6 +15,7 @@ import { CardsModule } from './cards/cards.module';
 import { ChatModule } from './chat/chat.module';
 import { AiModule } from './ai/ai.module';
 import { CurrencyModule } from './currency/currency.module';
+import { EmiModule } from './emi/emi.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { CurrencyModule } from './currency/currency.module';
     ChatModule,
     AiModule,
     CurrencyModule,
+    EmiModule,
   ],
   controllers: [AppController],
   providers: [AppService],

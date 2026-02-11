@@ -48,6 +48,7 @@ model User {
   beneficiaries Beneficiary[]
   payments    Payment[]
   cards       Card[]
+  emiPlans    EmiPlan[]
 
   @@index([name])
   @@index([email])
@@ -206,6 +207,7 @@ model Account {
   transactions    Transaction[]
   payments        Payment[]
   cards           Card[]
+  emiPlans        EmiPlan[]
 
   @@index([userId])
   @@index([accountNumber])
@@ -447,11 +449,76 @@ model Payment {
   user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   account         Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
   beneficiary     Beneficiary?  @relation(fields: [beneficiaryId], references: [id], onDelete: SetNull)
-  
+  emiInstallment  EmiInstallment?
+
   @@index([userId])
   @@index([accountId])
   @@index([paymentType])
   @@index([paymentStatus])
   @@index([reference])
   @@index([createdAt])
+}
+
+// --- EMI (Equated Monthly Installment) ---
+enum EmiPlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum EmiInstallmentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+model EmiPlan {
+  id                String        @id @default(uuid()) @db.Uuid
+  userId            String        @db.Uuid
+  accountId         String        @db.Uuid
+  productName       String?       // e.g. "Personal Loan", "Car Loan"
+  principal         Decimal       @db.Decimal(15, 2)
+  interestRateAnnual Decimal      @db.Decimal(5, 2)   // e.g. 12.5 for 12.5%
+  tenureMonths      Int
+  emiAmount         Decimal       @db.Decimal(15, 2)
+  currency          String        @default("PKR")
+  status            EmiPlanStatus @default(ACTIVE)
+  startDate         DateTime
+  endDate           DateTime
+  nextDueDate       DateTime?     // next unpaid installment due
+  totalInterest     Decimal       @db.Decimal(15, 2)  // total interest over tenure
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account      Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  installments EmiInstallment[]
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([status])
+  @@index([nextDueDate])
+}
+
+model EmiInstallment {
+  id                String              @id @default(uuid()) @db.Uuid
+  emiPlanId         String              @db.Uuid
+  installmentNumber Int
+  dueDate           DateTime
+  amount            Decimal             @db.Decimal(15, 2)
+  principalComponent Decimal            @db.Decimal(15, 2)
+  interestComponent  Decimal            @db.Decimal(15, 2)
+  status            EmiInstallmentStatus @default(PENDING)
+  paidAt            DateTime?
+  paymentId         String?             @unique @db.Uuid
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  emiPlan  EmiPlan   @relation(fields: [emiPlanId], references: [id], onDelete: Cascade)
+  payment  Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([emiPlanId])
+  @@index([dueDate])
+  @@index([status])
 }

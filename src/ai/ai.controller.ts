@@ -7,8 +7,8 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { User, UserRole } from '@db';
 import { ApiResponse } from 'src/common/types';
 import { AiService } from './ai.service';
-import { GenerateTextDto, BankStatementAnalyzerQueryDto } from './dto/ai.dto';
-import type { BankStatementAnalysis } from './types';
+import { GenerateTextDto, BankStatementAnalyzerQueryDto, EmiAffordabilityDto } from './dto/ai.dto';
+import type { BankStatementAnalysis, EmiAffordabilityAnalysis } from './types';
 
 @Controller('ai')
 @ApiTags('AI')
@@ -193,6 +193,54 @@ export class AiController {
 
     return {
       message: 'Bank statement analyzed successfully',
+      success: true,
+      data: analysis,
+    };
+  }
+
+  @Roles(...Object.values(UserRole))
+  @Post('emi/affordability')
+  @ApiOperation({
+    summary: 'EMI affordability analysis',
+    description:
+      "Analyzes whether the user can afford a new EMI based on their recent transaction outflows and existing EMI burden. Returns AI-generated summary, recommendation, risk level, and optional max suggested EMI.",
+  })
+  @SwaggerResponse({
+    status: 200,
+    description: 'EMI affordability analysis completed',
+    schema: {
+      example: {
+        message: 'EMI affordability analyzed successfully',
+        success: true,
+        data: {
+          summary: 'Your average monthly outflows are 45,000 PKR...',
+          affordable: true,
+          recommendation: 'You can consider this loan; ensure you keep a buffer.',
+          maxSuggestedEmi: 15000,
+          riskLevel: 'MEDIUM',
+          hints: ['Build a 3-month buffer', 'Set up auto-debit for EMI'],
+        },
+      },
+    },
+  })
+  @SwaggerResponse({ status: 400, description: 'Invalid request body' })
+  @SwaggerResponse({ status: 404, description: 'Account not found' })
+  @SwaggerResponse({ status: 401, description: 'Unauthorized' })
+  @SwaggerResponse({ status: 503, description: 'GEMINI_API_KEY not configured' })
+  async analyzeEmiAffordability(
+    @CurrentUser() user: User,
+    @Body() dto: EmiAffordabilityDto,
+  ): Promise<ApiResponse<EmiAffordabilityAnalysis>> {
+    const rate = dto.interestRateAnnual ?? 12;
+    const analysis = await this.aiService.analyzeEmiAffordability(
+      user,
+      dto.principal,
+      dto.tenureMonths,
+      rate,
+      dto.accountId,
+    );
+    return {
+      message: 'EMI affordability analyzed successfully',
       success: true,
       data: analysis,
     };

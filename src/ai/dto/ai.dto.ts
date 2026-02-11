@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class GenerateTextDto {
   @ApiProperty({ description: 'User prompt for text generation', example: 'Summarize my spending this month.' })
@@ -36,4 +36,30 @@ export class BankStatementAnalyzerQueryDto {
   @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'endDate must be YYYY-MM-DD' })
   endDate: string;
+}
+
+export class EmiAffordabilityDto {
+  @ApiProperty({ description: 'Loan principal amount (PKR)', example: 500000 })
+  @IsNumber()
+  @Min(1000)
+  @Max(50000000)
+  principal: number;
+
+  @ApiProperty({ description: 'Tenure in months', example: 12 })
+  @IsNumber()
+  @Min(1)
+  @Max(360)
+  tenureMonths: number;
+
+  @ApiPropertyOptional({ description: 'Annual interest rate (%). Default 12', example: 12.5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.1)
+  @Max(50)
+  interestRateAnnual?: number;
+
+  @ApiPropertyOptional({ description: 'Account ID to base outflow analysis on. If omitted, uses all user accounts.' })
+  @IsOptional()
+  @IsUUID()
+  accountId?: string;
 }

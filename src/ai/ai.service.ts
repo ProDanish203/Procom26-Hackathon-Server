@@ -15,10 +15,15 @@ import {
   createListUserAccountsTool,
   createGetRecentTransactionsTool,
   createGetAccountBalanceTool,
+  createGetUserEmiPlansTool,
+  createGetUserEmiScheduleTool,
+  createEmiCalculatorTool,
 } from './tools';
-import { BANKING_SYSTEM_PROMPT, BANK_STATEMENT_ANALYZER_PROMPT, CHAT_ASSISTANT_SYSTEM_PROMPT, getChatAssistantSystemPromptWithContext } from './prompts';
-import { BankStatementAnalysisSchema, type BankStatementAnalysis } from './types';
+import { BANKING_SYSTEM_PROMPT, BANK_STATEMENT_ANALYZER_PROMPT, CHAT_ASSISTANT_SYSTEM_PROMPT, getChatAssistantSystemPromptWithContext, EMI_AFFORDABILITY_PROMPT } from './prompts';
+import { BankStatementAnalysisSchema, EmiAffordabilityAnalysisSchema, type BankStatementAnalysis, type EmiAffordabilityAnalysis } from './types';
 import type { User } from '@db';
+import { EmiPlanStatus, TransactionType } from '@db';
+import { EmiService } from 'src/emi/emi.service';
 
 @Injectable()
 export class AiService {
@@ -27,6 +32,7 @@ export class AiService {
   constructor(
     private readonly configService: ConfigService,
     private readonly prismaService: PrismaService,
+    private readonly emiService: EmiService,
   ) {}
 
   private getGoogle() {
@@ -55,6 +61,9 @@ export class AiService {
       listUserAccounts: createListUserAccountsTool(this.prismaService, userId),
       getRecentTransactions: createGetRecentTransactionsTool(this.prismaService, userId),
       getAccountBalance: createGetAccountBalanceTool(this.prismaService, userId),
+      getUserEmiPlans: createGetUserEmiPlansTool(this.prismaService, userId),
+      getUserEmiSchedule: createGetUserEmiScheduleTool(this.prismaService, userId),
+      emiCalculator: createEmiCalculatorTool(),
     };
   }
 
@@ -309,6 +318,93 @@ export class AiService {
     const output = result.output as BankStatementAnalysis;
     if (!output || !output.summary || !output.improvementHints) {
       this.logger.warn('AI returned incomplete analysis', AiService.name);
+      throw throwError('Analysis could not be generated', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    return output;
+  }
+
+  async analyzeEmiAffordability(
+    user: User,
+    principal: number,
+    tenureMonths: number,
+    interestRateAnnual: number,
+    accountId?: string,
+  ): Promise<EmiAffordabilityAnalysis> {
+    const rate = interestRateAnnual ?? 12;
+    const { emiAmount } = this.emiService.calculate(principal, rate, tenureMonths);
+
+    const accountWhere = accountId
+      ? { id: accountId, userId: user.id }
+      : { userId: user.id, closedAt: null };
+    const accounts = await this.prismaService.account.findMany({
+      where: accountWhere,
+      select: { id: true, balance: true, currency: true },
+    });
+    if (accounts.length === 0) {
+      throw throwError('No account found for user', HttpStatus.NOT_FOUND);
+    }
+    const accountIds = accounts.map((a) => a.id);
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    const debitTypes: TransactionType[] = [
+      TransactionType.WITHDRAWAL,
+      TransactionType.PAYMENT,
+      TransactionType.TRANSFER,
+      TransactionType.FEE,
+    ];
+    const transactions = await this.prismaService.transaction.findMany({
+      where: {
+        accountId: { in: accountIds },
+        createdAt: { gte: threeMonthsAgo },
+        type: { in: debitTypes },
+      },
+      select: { amount: true, createdAt: true },
+    });
+    const byMonth = new Map<string, number>();
+    for (const t of transactions) {
+      const key = t.createdAt.toISOString().slice(0, 7);
+      const amt = Math.abs(Number(t.amount));
+      byMonth.set(key, (byMonth.get(key) ?? 0) + amt);
+    }
+    const monthlyOutflows = byMonth.size > 0 ? [...byMonth.values()] : [0];
+    const avgMonthlyOutflow = monthlyOutflows.reduce((a, b) => a + b, 0) / monthlyOutflows.length;
+
+    const activeEmiPlans = await this.prismaService.emiPlan.findMany({
+      where: { userId: user.id, status: { in: [EmiPlanStatus.ACTIVE, EmiPlanStatus.OVERDUE] } },
+      select: { emiAmount: true },
+    });
+    const existingEmiBurden = activeEmiPlans.reduce((sum, p) => sum + Number(p.emiAmount), 0);
+    const totalBalance = accounts.reduce((sum, a) => sum + Number(a.balance), 0);
+    const currency = accounts[0]?.currency ?? 'PKR';
+
+    const context = {
+      proposedLoan: { principal, tenureMonths, interestRateAnnual: rate, emiAmount },
+      userFinances: {
+        averageMonthlyOutflow: Math.round(avgMonthlyOutflow * 100) / 100,
+        existingMonthlyEmiBurden: Math.round(existingEmiBurden * 100) / 100,
+        totalAccountBalance: Math.round(totalBalance * 100) / 100,
+        currency,
+        monthsAnalyzed: byMonth.size,
+      },
+    };
+    const prompt = `${EMI_AFFORDABILITY_PROMPT}\n\nContext (JSON):\n${JSON.stringify(context, null, 2)}`;
+
+    const model = this.getModel();
+    const result = await generateText({
+      model,
+      system: BANKING_SYSTEM_PROMPT,
+      prompt,
+      output: Output.object({
+        name: 'EmiAffordabilityAnalysis',
+        description: 'Structured EMI affordability analysis',
+        schema: EmiAffordabilityAnalysisSchema,
+      }),
+    });
+
+    const output = result.output as EmiAffordabilityAnalysis;
+    if (!output?.summary || output.riskLevel == null) {
+      this.logger.warn('AI returned incomplete EMI affordability analysis', AiService.name);
       throw throwError('Analysis could not be generated', HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return output;
