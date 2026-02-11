@@ -296,10 +296,10 @@ export class AccountService {
       const transactions = await this.prismaService.transaction.findMany({
         where: {
           accountId,
-          createdAt: {
-            gte: startDate,
-            lte: endDate,
-          },
+          // createdAt: {
+          //   gte: startDate,
+          //   lte: endDate,
+          // },
         },
         orderBy: { createdAt: 'asc' },
       });
