@@ -14,6 +14,7 @@ import { PaymentModule } from './payment/payment.module';
 import { CardsModule } from './cards/cards.module';
 import { ChatModule } from './chat/chat.module';
 import { AiModule } from './ai/ai.module';
+import { CurrencyModule } from './currency/currency.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { AiModule } from './ai/ai.module';
     CardsModule,
     ChatModule,
     AiModule,
+    CurrencyModule,
   ],
   controllers: [AppController],
   providers: [AppService],
