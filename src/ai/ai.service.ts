@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateText, streamText, Output, stepCountIs, type LanguageModel } from 'ai';
+import { generateText, streamText, Output, stepCountIs, type LanguageModel, type ModelMessage } from 'ai';
 import type { z } from 'zod';
 
 export interface AIStreamTextResult {
@@ -16,7 +16,7 @@ import {
   createGetRecentTransactionsTool,
   createGetAccountBalanceTool,
 } from './tools';
-import { BANKING_SYSTEM_PROMPT, BANK_STATEMENT_ANALYZER_PROMPT, CHAT_ASSISTANT_SYSTEM_PROMPT } from './prompts';
+import { BANKING_SYSTEM_PROMPT, BANK_STATEMENT_ANALYZER_PROMPT, CHAT_ASSISTANT_SYSTEM_PROMPT, getChatAssistantSystemPromptWithContext } from './prompts';
 import { BankStatementAnalysisSchema, type BankStatementAnalysis } from './types';
 import type { User } from '@db';
 
@@ -69,6 +69,21 @@ export class AiService {
     return result.text ?? '';
   }
 
+  /** Chat reply with full conversation history for context (multi-turn). Uses current date context so "this month" etc. are inferred. */
+  async chatReplyWithHistory(
+    userId: string,
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  ): Promise<string> {
+    const result = await this.generateTextWithMessages({
+      messages,
+      systemPrompt: getChatAssistantSystemPromptWithContext(),
+      tools: true,
+      maxSteps: 5,
+      toolsOverride: this.getToolsForUser(userId),
+    });
+    return result.text ?? '';
+  }
+
   async generateText(options: {
     prompt: string;
     systemPrompt?: string;
@@ -91,6 +106,41 @@ export class AiService {
       model,
       system: systemPrompt,
       prompt,
+      tools,
+      ...(useTools && { stopWhen: stepCountIs(maxSteps) }),
+    });
+
+    return {
+      text: result.text,
+      usage: result.usage,
+      steps: result.steps,
+      toolCalls: result.toolCalls,
+      toolResults: result.toolResults,
+    };
+  }
+
+  private async generateTextWithMessages(options: {
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    systemPrompt?: string;
+    tools?: boolean;
+    maxSteps?: number;
+    toolsOverride?: ReturnType<AiService['getToolsForUser']>;
+  }) {
+    const {
+      messages,
+      systemPrompt = BANKING_SYSTEM_PROMPT,
+      tools: useTools = false,
+      maxSteps = 5,
+      toolsOverride,
+    } = options;
+    const model = this.getModel();
+    const toolsRaw = useTools ? (toolsOverride ?? this.getTools()) : undefined;
+    const tools = toolsRaw as Parameters<typeof generateText>[0]['tools'];
+
+    const result = await generateText({
+      model,
+      system: systemPrompt,
+      messages: messages as ModelMessage[],
       tools,
       ...(useTools && { stopWhen: stepCountIs(maxSteps) }),
     });

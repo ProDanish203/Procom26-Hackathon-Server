@@ -36,7 +36,7 @@ export class ChatController {
   @SwaggerResponse({ status: 401, description: 'Unauthorized' })
   @SwaggerResponse({ status: 503, description: 'GEMINI_API_KEY not configured' })
   async sendMessage(@CurrentUser() user: User, @Body() dto: SendMessageDto): Promise<ApiResponse<ChatbotReply>> {
-    const reply = await this.chatService.handleMessage(user.id, dto);
+    const reply = await this.chatService.handleMessage(user.id, `http:${user.id}`, dto);
     return {
       message: 'Message sent successfully',
       success: true,

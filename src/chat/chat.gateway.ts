@@ -80,6 +80,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: AuthenticatedSocket) {
+    this.chatService.clearHistory(client.id);
     if (client.userId) {
       this.logger.log(`Chat disconnected: user ${client.userId}`);
     }
@@ -93,7 +94,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      const reply = await this.chatService.handleMessage(client.userId, data);
+      const reply = await this.chatService.handleMessage(client.userId, client.id, data);
       client.emit('bot-message', reply);
     } catch (error) {
       this.logger.error('Chat send-message error', (error as Error)?.stack, ChatGateway.name);
